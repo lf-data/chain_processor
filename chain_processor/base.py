@@ -1,13 +1,12 @@
-from .utils import _input_args, _is_positional_or_keyword, _get_args, _random_string_generator
+from .utils import _input_args, _is_positional_or_keyword, _get_args, _id_generator, Settings
 from typing import Any, Optional, Callable, Union, List, Dict, Tuple
 from functools import lru_cache
 from copy import deepcopy
 import json
 from multiprocessing.pool import ThreadPool
-import os
 import inspect
 
-lru_cache()
+lru_cache(maxsize=Settings.maxsize)
 def _check_input_node(inputs) ->None:
     # If inputs is a list, tuple, or dict, iterate through each element
     if isinstance(inputs, (list, tuple, dict)):
@@ -23,7 +22,7 @@ def _check_input_node(inputs) ->None:
         if not isinstance(inputs, (Chain, Node, Layer)):
             raise TypeError('Only "Node", "Layer", "Chain", or lists of these classes can be used as inputs')
 
-lru_cache()
+lru_cache(maxsize=Settings.maxsize)
 def _convert_parallel_node(inputs) ->Any:
     # If inputs is a Chain, Node, or Layer, return it as is
     if isinstance(inputs, (Chain, Node, Layer)):
@@ -51,23 +50,23 @@ def node(description: Optional[str] = None, name: Optional[str] = None):
 class BaseChain:
     # Method to add a node to the chain
 
-    def add_node(self, *args, **kwargs) ->object:
+    def add_node(self, *args, **kwargs) ->"BaseChain":
         return self
     
     # Overloading the >> operator to add a node after the current chain
-    def __rshift__(self, other) ->object:
+    def __rshift__(self, other) ->"BaseChain":
         return self.add_node(other, before=False)
     
     # Overloading the << operator to add a node before the current chain
-    def __rlshift__(self, other) ->object:
+    def __rlshift__(self, other) ->"BaseChain":
         return self.add_node(other, before=False)
     
     # Overloading the << operator to add a node before the current chain
-    def __lshift__(self, other) ->object:
+    def __lshift__(self, other) ->"BaseChain":
         return self.add_node(other, before=True)
     
     # Overloading the >> operator to add a node after the current chain
-    def __rrshift__(self, other) ->object:
+    def __rrshift__(self, other) ->"BaseChain":
         return self.add_node(other, before=True)
 
 class Chain(BaseChain):
@@ -151,7 +150,7 @@ class Layer(BaseChain):
         # Initialize the result container as a dictionary if nodes are stored in a dictionary, otherwise as a list
         res = {} if self._is_dict else []
         # Determine the number of CPU cores to use, at least 1 and at most half of the available cores
-        cpus = max([int(os.cpu_count()/2), 1])
+        cpus = Settings.cpus
         # Function to run a node with given arguments, used into Thread Pool
         run_node = lambda node, args, kwargs: node(*args, **kwargs)
         # Use a thread pool to parallelize the execution of nodes
@@ -197,7 +196,7 @@ class Node(BaseChain):
         # Store the function to be executed by the node
         self.func = func
         # Generate a random ID for the node
-        self.id = _random_string_generator(30)
+        self.id = _id_generator(30)
     
     def add_node(self, other, before: bool) ->BaseChain:
         # Create a deep copy of the current node to avoid modifying the original

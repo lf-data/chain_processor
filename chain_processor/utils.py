@@ -2,12 +2,18 @@ import inspect
 import random
 import string
 from typing import Callable, Tuple, List, Dict
+import os
+
+
+class Settings:
+    cpus: int = max([int(os.cpu_count()/2), 1]) # Number of CPUs for multiprocessing 
+    maxsize: int = 2 # maxsize of lru_cache function
 
 # Function to generate a random string of a given size
-def _random_string_generator(str_size) ->str:
+def _id_generator(str_size) ->str:
     # Define the characters to use for the string: all ASCII letters
     chars = string.ascii_letters
-    # Generate a random string by selecting random characters
+    # Generate a random id by selecting random characters
     return ''.join(random.choice(chars) for x in range(str_size))
 
 # Function to map input arguments to the node's parameters
