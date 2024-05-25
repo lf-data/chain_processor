@@ -46,8 +46,6 @@ def sum_all(*args):
 Chains are created by using the `>>` and `<<` operators to combine nodes sequentially.
 
 ```python
-from chain_processor import Chain
-
 # Basic chain example
 base_chain = plus_one >> plus_two >> [plus_one, plus_one] >> sum_all
 print(base_chain(1))  # Output: 10
