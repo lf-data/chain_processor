@@ -13,9 +13,9 @@ authors = [
 urls = { "Homepage" = "https://github.com/lf-data/chain_processor" }
 requires-python = ">=3.6"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent"
 ]
 
 [tool.setuptools.packages.find]
