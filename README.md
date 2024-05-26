@@ -19,95 +19,201 @@ Install Chain Processor directly from GitHub using pip:
 pip install git+https://github.com/lf-data/chain_processor.git
 ```
 
-## Usage
+## Examples
 
-### Creating Nodes
+### 1. Basic Example with Math Operations
 
-Use the `@node` decorator to create nodes from functions.
+```python
+@node(description="Add two numbers")
+def add(a, b):
+    return a + b
+
+@node(description="Add two numbers")
+def divide(a, b):
+    return a/b
+
+@node(description="Multiply two numbers")
+def multiply(a, b):
+    return a * b
+
+chain = [add, divide] >> multiply
+print(chain(2, 3))  # Output: 3.333
+```
+
+### 2. String Manipulation
 
 ```python
 from chain_processor import node
 
-@node(description="This node adds one to the input number", name="PlusOneNode")
-def plus_one(num: int):
-    return num + 1
+@node(description="Convert to uppercase")
+def to_upper(text):
+    return text.upper()
 
-@node(description="This node adds two to the input number", name="PlusTwoNode")
-def plus_two(num: int):
-    return num + 2
+@node(description="Reverse the string")
+def reverse(text):
+    return text[::-1]
 
-@node(description="This node sums all input numbers", name="SumAllNode")
-def sum_all(*args):
-    return sum(args)
+chain = to_upper >> reverse
+print(chain("hello"))  # Output: "OLLEH"
 ```
 
-### Creating Chains
-
-Chains are created by using the `>>` and `<<` operators to combine nodes sequentially.
+### 3. Data Processing with `pandas`
 
 ```python
-# Basic chain example
-base_chain = plus_one >> plus_two >> [plus_one, plus_one] >> sum_all
-print(base_chain(1))  # Output: 10
+import pandas as pd
+from chain_processor import node
 
-# Intermediate chain example with nodes added before the base chain
-intermediate_chain = base_chain << plus_one << plus_two << sum_all
-print(intermediate_chain(1))  # Output: 16
+@node(description="Create a DataFrame")
+def create_df(data):
+    return pd.DataFrame(data)
 
-# Complex chain example with parallel and sequential operations
-chain = plus_one >> [base_chain, plus_two] >> intermediate_chain
-print(chain(1))  # Output: 46
+@node(description="Calculate mean of a column")
+def calculate_mean(df):
+    return df['value'].mean()
+
+@node(description="Calculate the standard deviation of a column")
+def calculate_std(df):
+    return df['value'].std()
+
+chain = create_df >> [calculate_mean, calculate_std]
+data = {'value': [10, 20, 30, 40]}
+print(chain(data))  # Output: [25.0, 12.909944487358056]
 ```
 
-### Prime Number Chain Example
-
-Create a chain to check if a number is prime and print the result.
+### 4. JSON Processing with `json`
 
 ```python
-@node(description="This node checks if a number is prime", name="PrimeCheckNode")
-def give_prime_num(n):
-    if n <= 3:
-        return n > 1
-    if n % 2 == 0 or n % 3 == 0:
-        return {"prime": False}
-    i = 5
-    while i ** 2 <= n:
-        if n % i == 0 or n % (i + 2) == 0:
-            return {"prime": False}
-        i += 6
-    return {"prime": True}
+import json
+from chain_processor import node
 
-@node(description="This node prints if the number is prime", name="PrintPrimeNode")
-def print_prime(prime):
-    if prime:
-        return "This number is prime"
-    else:
-        return "This number is not prime"
+@node(description="Parse JSON")
+def parse_json(json_str):
+    return {"data": json.loads(json_str)}
 
-prime_chain = give_prime_num >> print_prime
-print(prime_chain(10))  # Output: This number is not prime
+@node(description="Extract value by key")
+def extract_value(data):
+    return data['name']
+
+chain = parse_json  >> extract_value
+json_str = '{"name": "Alice", "age": 30}'
+print(chain(json_str))  # Output: "Alice"
 ```
 
-### Flexible Chain Operations with Named Inputs
-
-Create a chain to greet two names provided as a dictionary.
+### 5. Web Requests with `requests`
 
 ```python
-@node(description="This node greets two names", name="HelloWorldNode")
-def hello_world(name1, name2):
-    return f"Ciao {name1} e {name2}"
+import requests
+from chain_processor import node, Node
 
-@node(description="This node retrieves the first name", name="GetName1Node")
-def get_name1(x1):
-    return x1
+@node(description="Fetch URL content")
+def fetch_url(url):
+    return requests.get(url).text
 
-@node(description="This node retrieves the second name", name="GetName2Node")
-def get_name2(x2):
-    return x2
+@node(description="Count occurrences of a word")
+def count_word(text, word):
+    return text.count(word)
 
-chain_name = {"name1": get_name1, "name2": get_name2} >> hello_world
-inputs = {"x1": "Marco", "x2": "Francesco"}
-print(chain_name(**inputs))  # Output: Ciao Marco e Francesco
+chain = {"text":fetch_url, "word": Node(func=lambda word: word)} >> count_word
+print(chain(url="https://www.python.org/", word="Python"))  # Output: Number of occurrences of "Python"
+```
+
+### 6. Image Processing with `PIL`
+
+```python
+@node(description="Open an image")
+def open_image(path):
+    return Image.open(path)
+
+@node(description="Apply blur filter")
+def apply_blur(image):
+    return image.filter(ImageFilter.BLUR)
+
+chain = open_image >> apply_blur
+image_path = "example.jpg"
+blurred_image = chain(image_path)
+blurred_image.show()
+```
+
+### 7. Data Transformation with `numpy`
+
+```python
+import numpy as np
+from chain_processor import node
+
+@node(description="Create numpy array")
+def create_array(data):
+    return np.array(data)
+
+@node(description="Calculate sum of array")
+def array_sum(array):
+    return np.sum(array)
+
+chain = create_array >> array_sum
+data = [1, 2, 3, 4, 5]
+print(chain(data))  # Output: 15
+```
+
+### 8. Time Manipulation with `datetime`
+
+```python
+from datetime import datetime, timedelta
+from chain_processor import node
+
+@node(description="Get current time")
+def current_time():
+    return datetime.now()
+
+@node(description="Add days to datetime")
+def add_days(dt):
+    return dt + timedelta(days=5)
+
+chain = current_time >> add_days
+print(chain())  # Output: Current date + 5 days
+```
+
+### 9. Regular Expressions with `re`
+
+```python
+import re
+from chain_processor import node, Chain
+
+@node(description="Find all matches")
+def find_matches(text, pattern):
+    return re.findall(pattern, text)
+
+@node(description="Count matches")
+def count_matches(matches):
+    return len(matches)
+
+chain = find_matches >> count_matches
+text = "The rain in Spain stays mainly in the plain."
+pattern = r'\bin\b'
+print(chain(text, pattern))  # Output: 2
+```
+
+### 10. Machine Learning with `scikit-learn`
+
+```python
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from chain_processor import node
+
+@node(description="Load dataset")
+def load_data():
+    data = load_iris()
+    return train_test_split(data.data, data.target, test_size=0.2)
+
+@node(description="Train model")
+def train_model(X_train, X_test, y_train, y_test):
+    model = RandomForestClassifier()
+    model.fit(X_train, y_train)
+    predictions = model.predict(X_test)
+    return accuracy_score(y_test, predictions)
+
+chain = load_data >> train_model
+print(chain())  # Output: Model accuracy
 ```
 
 ## Contributing
@@ -116,4 +222,4 @@ Contributions are welcome! Please submit a pull request or open an issue to disc
 
 ## License
 
-This project is licensed under the Apache 2 License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2 License. See the LICENSE file for details.
