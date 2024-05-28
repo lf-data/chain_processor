@@ -19,13 +19,13 @@ def _check_input_node(inputs) ->None:
                 _check_input_node(inp)
     else:
         # If input is not a Chain, Node, or Layer, raise a TypeError
-        if not isinstance(inputs, (Chain, Node, Layer)):
-            raise TypeError('Only "Node", "Layer", "Chain", or lists of these classes can be used as inputs')
+        if not isinstance(inputs, BaseChain):
+            raise TypeError('Only "BaseChain", or lists of this class can be used as inputs')
 
 lru_cache(maxsize=Settings.maxsize)
 def _convert_parallel_node(inputs) ->Any:
     # If inputs is a Chain, Node, or Layer, return it as is
-    if isinstance(inputs, (Chain, Node, Layer)):
+    if isinstance(inputs, BaseChain):
         return inputs
     else:
         if isinstance(inputs, dict):
@@ -40,10 +40,20 @@ def _convert_parallel_node(inputs) ->Any:
                     inputs[i] = _convert_parallel_node(inputs[i])
         return Layer(inputs)
 
-# Decorator function to create a node
-def node(description: Optional[str] = None, name: Optional[str] = None):
+# Decorator function to create a node or conditional_node
+def node(description: Optional[str] = None,  
+         name: Optional[str] = None, 
+         conditional: bool = False, 
+         true_node: Optional[Union["BaseChain"]] = None, 
+         false_node: Optional[Union["BaseChain"]] = None):
     def run_node(func: Callable):
-        return Node(func, description=description, name=name)
+        if conditional and true_node is not None and false_node is not None:
+            return ConditionalNode(func, true_node=true_node, 
+                                   false_node=false_node, 
+                                   description=description, 
+                                   name=name)
+        else:
+            return Node(func, description=description, name=name)
     
     return run_node
 
@@ -119,8 +129,6 @@ class Chain(BaseChain):
 
 class Layer(BaseChain):
     def __init__(self, nodes: Union[List, Tuple, Dict]):
-        # Ensure there are at least two nodes in the layer
-        assert len(nodes) > 1, "There must be at least two nodes"
         # Ensure that there are no nested layers within this layer
         assert len([node for node in nodes if isinstance(node, Layer)]) == 0, "Layers cannot contain other Layers"
         # Check if the input nodes are valid
@@ -230,3 +238,58 @@ class Node(BaseChain):
                                 "description":self.description,
                                 "args": self.args})
         return f"Node({json_func})"
+    
+
+class ConditionalNode(Node):
+    def __init__(self, func: Callable, 
+                 true_node: Union[BaseChain],
+                 false_node: Union[BaseChain],
+                 description: Optional[str] = None, 
+                 name: Optional[str] = None):
+        super().__init__(func, description, name)
+        self.true_node = true_node
+        self.false_node = false_node
+    
+    def __call__(self, *args, **kwargs)-> Any:
+        # If the function does not accept positional arguments
+        if not self.positional_or_keyword:
+            # Map the input arguments to the function's parameters
+            inp_args = _input_args(args, kwargs, node_args=self.args)
+            # Call the function with keyword arguments
+            res = self.func(**inp_args)
+            assert isinstance(res, bool), "The output of ConditionalNode's function must be boolean"
+            # if the output is true the true_node will be executed, otherwise the false_node
+            return self.true_node(*args, **kwargs) if res else self.false_node(*args, **kwargs)
+        else:
+            # Call the function with positional arguments
+            res = self.func(*args, **kwargs)
+            assert isinstance(res, bool), "The output of ConditionalNode's function must be boolean"
+            return self.true_node(*args, **kwargs) if res else self.false_node(*args, **kwargs)
+        
+    def __repr__(self) ->str:
+        json_func = json.dumps({'name':self.name, 
+                                "description":self.description,
+                                "args": self.args})
+        json_true = json.dumps({'name':self.true_node.name, 
+                                "description":self.true_node.description,
+                                "args": self.true_node.args})
+        json_false = json.dumps({'name':self.false_node.name, 
+                                "description":self.false_node.description,
+                                "args": self.false_node.args})
+        return f"ConditionalNode(func:{json_func}, true: {json_true}, false: {json_false})"
+    
+
+class Variable(BaseChain):
+    def __init__(self, value: Any, name: str):
+        self.value = value
+        self.name = name
+    
+    def __call__(self, *args, **kwargs)-> Any:
+        return self.value
+    
+    def __repr__(self) ->str:
+        json_func = json.dumps({'value':self.value, 
+                                "name":self.name})
+        return f"Variable({json_func})"
+
+
