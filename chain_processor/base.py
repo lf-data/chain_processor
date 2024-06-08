@@ -361,7 +361,9 @@ class ConditionalNode(Node):
         self.first_nodes = [(self.name, self.name, {"shape":'diamond', "style":'filled', "color":'lightgrey'})]
         self.last_nodes = [*true_node.last_nodes, *false_node.last_nodes]
         self.nodes = self.first_nodes + [*true_node.nodes, *false_node.nodes]
-        self.edges = [(self.name, true_node.nodes[0][0], {"xlabel": "True"}), (self.name, false_node.nodes[0][0], {"label": "False"}), *true_node.edges, *false_node.edges]
+        true_edges = [(self.name, x[0], {"xlabel": "true"}) for x in true_node.first_nodes]
+        false_edges = [(self.name, x[0], {"xlabel": "false"}) for x in false_node.first_nodes]
+        self.edges = [*true_edges, *false_edges, *true_node.edges, *false_node.edges]
         self._dot = _create_dot(self.edges, self.nodes, self.name, self.description)
     
     def __call__(self, *args, **kwargs)-> Any:
