@@ -62,7 +62,7 @@ print(chain(2, 3))  # Output: 3.333
 chain.view()
 ```
 
-![chain1](images/chain1.png)
+![chain1](./images/chain1.png)
 
 ### 2. String Manipulation
 
@@ -273,7 +273,7 @@ print(chain(4)) # This number is not prime
 chain.view()
 ```
 
-![chain2](images/chain2.png)
+![chain2](./images/chain2.png)
 
 
 ### 12. Complex chain with nodes repeated several times
@@ -299,7 +299,7 @@ print(chain(1)) # Output: 46
 chain.view()
 ```
 
-![chain3](images/chain3.png)
+![chain3](./images/chain3.png)
 
 
 
