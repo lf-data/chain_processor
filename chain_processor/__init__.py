@@ -8,7 +8,7 @@ __author__ = 'Francesco Lorè'
 __email__ = 'flore9819@gmail.com'
 __status__ = 'Development'
 
-__version__ = "0.2.0"
+__version__ = "0.1.2"
 
 # Inizializza colorama
 init(autoreset=True)
