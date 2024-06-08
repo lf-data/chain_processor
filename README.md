@@ -19,6 +19,13 @@ Install Chain Processor directly from GitHub using pip:
 pip install git+https://github.com/lf-data/chain_processor.git
 ```
 
+or 
+
+```bash
+pip install chain-processor
+```
+
+
 Since the package use graphviz library, to render the generated DOT source code, you also need to install Graphviz
 ([download page](http://www.graphviz.org/download/),
 [archived versions](http://www.graphviz.org/Download_archive.php),
