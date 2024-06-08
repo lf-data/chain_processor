@@ -1,22 +1,28 @@
-[build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "chain_processor"
-version = "0.1.0"
+version = "0.2.0"
 description = "A library for creating and managing chains of function nodes."
+authors = ["Francesco Lorè <flore9819@gmail.com>"]
 readme = "README.md"
-authors = [
-    { name = "Francesco Lorè", email = "flore9819@gmail.com" },
-]
-urls = { "Homepage" = "https://github.com/lf-data/chain_processor" }
-requires-python = ">=3.6"
+homepage = "https://github.com/lf-data/chain_processor"
+repository = "https://github.com/lf-data/chain_processor"
+license = "Apache-2.0"
+include = ["images/*"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent"
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
+[tool.poetry.dependencies]
+python = ">=3.8"
+graphviz = "^0.20.3"
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/lf-data/chain_processor/issues"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
