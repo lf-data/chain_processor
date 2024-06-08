@@ -1,12 +1,40 @@
-from .utils import _input_args, _is_positional_or_keyword, _get_args, _id_generator, Settings
+from .utils import _input_args, _is_positional_or_keyword, _get_args, _id_generator, _create_dot
 from typing import Any, Optional, Callable, Union, List, Dict, Tuple
 from functools import lru_cache
 from copy import deepcopy
-import json
-from multiprocessing.pool import ThreadPool
 import inspect
+import logging
+import json
+import os
+import multiprocessing.pool
 
-lru_cache(maxsize=Settings.maxsize)
+
+logger = logging.getLogger(__name__)
+
+def _remove_duplicate_node(node: "BaseChain", nodes: list):
+    for idx in range(len(node.nodes)):
+        name = node.nodes[idx][0]
+        if name in [xx[0] for xx in nodes]:
+            idxn = 1
+            new_name = name + str(idxn)
+            while new_name in [xx[0] for xx in nodes] or new_name in [yy[0] for yy in node.nodes]:
+                idxn +=1
+                new_name = name + str(idxn)
+            node.nodes[idx] = (new_name, *node.nodes[idx][1:])
+            new_edges = []
+            for idxe in range(len(node.edges)):
+                edge = node.edges[idxe]
+                tpl_edges = [new_name if ed == name else ed for ed in [edge[0], edge[1]]]
+                if len(edge) == 3:
+                    tpl_edges = tuple(tpl_edges + [edge[2]])
+                new_edges.append(tpl_edges)
+            node.edges = new_edges
+
+            node.first_nodes = [(new_name, *sn[1:]) if sn[0] == name else sn for sn in node.first_nodes]
+            node.last_nodes = [(new_name, *sn[1:]) if sn[0] == name else sn for sn in node.last_nodes]
+    return node
+
+lru_cache(maxsize=2)
 def _check_input_node(inputs) ->None:
     # If inputs is a list, tuple, or dict, iterate through each element
     if isinstance(inputs, (list, tuple, dict)):
@@ -22,7 +50,7 @@ def _check_input_node(inputs) ->None:
         if not isinstance(inputs, BaseChain):
             raise TypeError('Only "BaseChain", or lists of this class can be used as inputs')
 
-lru_cache(maxsize=Settings.maxsize)
+lru_cache(maxsize=2)
 def _convert_parallel_node(inputs) ->Any:
     # If inputs is a Chain, Node, or Layer, return it as is
     if isinstance(inputs, BaseChain):
@@ -80,11 +108,25 @@ class BaseChain:
         return self.add_node(other, before=True)
 
 class Chain(BaseChain):
-    def __init__(self, nodes: List[object]):
+    def __init__(self, nodes: List[BaseChain], name: str = "Chain", description: Optional[str] = None):
         # Ensure there are at least two nodes in the chain
         assert len(nodes) > 1, "There must be at least two nodes"
         _check_input_node(nodes)
         self._nodes = nodes
+        self.name = name
+        self.description = description
+        self.nodes = []
+        self.edges = []
+        for i in range(len(nodes)):
+            nodes[i] = _remove_duplicate_node(nodes[i], self.nodes)
+            x = nodes[i]
+            if i > 0:
+                self.edges += [(z[0], j[0]) for j in x.first_nodes for z in nodes[i-1].last_nodes]
+            self.nodes += x.nodes
+            self.edges += x.edges
+        self.first_nodes = nodes[0].first_nodes
+        self.last_nodes = nodes[-1].last_nodes
+        self._dot = _create_dot(self.edges, self.nodes, self.name, self.description)
 
     def add_node(self, other, before: bool) ->BaseChain:
         # Create a deep copy of the current instance to avoid modifying the original
@@ -100,43 +142,87 @@ class Chain(BaseChain):
             cls._nodes.insert(0, other)
         else:
             cls._nodes.append(other)
+        nodes = cls._nodes
+        cls.nodes = []
+        cls.edges = []
+        for i in range(len(nodes)):
+            nodes[i] = _remove_duplicate_node(nodes[i], cls.nodes)
+            x = nodes[i]
+            if i > 0:
+                cls.edges += [(z[0], j[0]) for j in x.first_nodes for z in nodes[i-1].last_nodes]
+            cls.nodes += x.nodes
+            cls.edges += x.edges
+        cls.first_nodes = nodes[0].first_nodes
+        cls.last_nodes = nodes[-1].last_nodes
+        cls._dot = _create_dot(cls.edges, cls.nodes, cls.name, cls.description)
         return cls
     
     def __call__(self, *args, **kwargs):
-        # Initialize a variable to store the output of the nodes
-        x = None
-        # Iterate over the nodes in the chain
-        for i, node in enumerate(self._nodes):
-            # For the first node, pass the arguments directly
-            if i == 0:
-                x = node(*args, **kwargs)
-            else:
-                # For subsequent nodes, process the output from the previous node
-                if isinstance(x, (list, tuple)):
-                    # If the output is a list or tuple, unpack it as positional arguments
-                    x = node(*x)
-                elif isinstance(x, dict):
-                    # If the output is a dictionary, unpack it as keyword arguments
-                    x = node(**x)
+        try:
+            # Initialize a variable to store the output of the nodes
+            x = None
+            # Iterate over the nodes in the chain
+            for i, node in enumerate(self._nodes):
+                # For the first node, pass the arguments directly
+                if i == 0:
+                    x = node(*args, **kwargs)
                 else:
-                    # Otherwise, pass the output as a single argument
-                    x = node(x)
-        return x
+                    # For subsequent nodes, process the output from the previous node
+                    if isinstance(x, (list, tuple)):
+                        # If the output is a list or tuple, unpack it as positional arguments
+                        x = node(*x)
+                    elif isinstance(x, dict):
+                        # If the output is a dictionary, unpack it as keyword arguments
+                        x = node(**x)
+                    else:
+                        # Otherwise, pass the output as a single argument
+                        x = node(x)
+            return x
+        except Exception as e:
+            logger.error(e, exc_info=True, extra={"id": self.name})
+
+    def render(self, *args, **kwargs):
+        self._dot.render(*args, **kwargs)
+
+    def view(self, *args, **kwargs):
+        self._dot.view(*args, **kwargs)
     
     def __repr__(self) -> str:
-        return f"Chain({self._nodes})"
+        json_repr = json.dumps({
+            "nodes": [x[1] for x in self.nodes],
+            "name": self.name,
+            "description": self.description 
+        })
+        return f"Chain({json_repr})"
     
 
 class Layer(BaseChain):
-    def __init__(self, nodes: Union[List, Tuple, Dict]):
+    def __init__(self, nodes: Union[List[BaseChain], Tuple[BaseChain], Dict[str, BaseChain]], 
+                 name: str = "Chain", 
+                 description: Optional[str] = None):
         # Ensure that there are no nested layers within this layer
         assert len([node for node in nodes if isinstance(node, Layer)]) == 0, "Layers cannot contain other Layers"
         # Check if the input nodes are valid
         _check_input_node(nodes)
         # Store the nodes in the layer
         self._nodes = nodes
+        self.name = name
+        self.description = description
         # Determine if the nodes are stored in a dictionary
         self._is_dict = True if isinstance(nodes, dict) else False
+        if self._is_dict:
+            nodes = list(nodes.values())
+        self.nodes = []
+        self.edges = []
+        self.first_nodes = []
+        self.last_nodes = []
+        for x in nodes:
+            x = _remove_duplicate_node(x, self.nodes)
+            self.first_nodes += x.first_nodes
+            self.last_nodes += x.last_nodes
+            self.nodes += x.nodes
+            self.edges += x.edges
+        self._dot = _create_dot(self.edges, self.nodes, self.name, self.description)
 
     def add_node(self, other, before: bool) ->BaseChain:
         # Create a deep copy of the current instance to avoid modifying the original
@@ -155,31 +241,39 @@ class Layer(BaseChain):
         return chain
     
     def __call__(self, *args, **kwargs)->Any:
+        try:
         # Initialize the result container as a dictionary if nodes are stored in a dictionary, otherwise as a list
-        res = {} if self._is_dict else []
-        # Determine the number of CPU cores to use, at least 1 and at most half of the available cores
-        cpus = Settings.cpus
-        # Function to run a node with given arguments, used into Thread Pool
-        run_node = lambda node, args, kwargs: node(*args, **kwargs)
-        # Use a thread pool to parallelize the execution of nodes
-        with ThreadPool(cpus) as pool:
-            if self._is_dict:
-                # If nodes are stored in a dictionary, create a mapping of nodes to their arguments
-                keys = list(self._nodes.keys())
-                nodes = list(self._nodes.values())
-                input_map = [(node, args, kwargs) for node in nodes]
-                # Execute the nodes in parallel and store the results in a dictionary
-                output = pool.starmap(run_node, input_map)
-                res = {y: x for y, x in zip(keys, output)}
-            else:
-                # If nodes are stored in a list or tuple, create a mapping of nodes to their arguments
-                input_map = [(node, args, kwargs) for node in self._nodes]
-                # Execute the nodes in parallel and store the results in a list
-                res = pool.starmap(run_node, input_map)
-        return res
+            res = {} if self._is_dict else []
+            # Determine the number of CPU cores to use, at least 1 and at most half of the available cores
+            cpus = max([int(os.cpu_count()/2), 1])
+            # Function to run a node with given arguments, used into Thread Pool
+            run_node = lambda node, args, kwargs: node(*args, **kwargs)
+            # Use a thread pool to parallelize the execution of nodes
+            with multiprocessing.pool.ThreadPool(cpus) as pool:
+                if self._is_dict:
+                    # If nodes are stored in a dictionary, create a mapping of nodes to their arguments
+                    keys = list(self._nodes.keys())
+                    nodes = list(self._nodes.values())
+                    input_map = [(node, args, kwargs) for node in nodes]
+                    # Execute the nodes in parallel and store the results in a dictionary
+                    output = pool.starmap(run_node, input_map)
+                    res = {y: x for y, x in zip(keys, output)}
+                else:
+                    # If nodes are stored in a list or tuple, create a mapping of nodes to their arguments
+                    input_map = [(node, args, kwargs) for node in self._nodes]
+                    # Execute the nodes in parallel and store the results in a list
+                    res = pool.starmap(run_node, input_map)
+            return res
+        except Exception as e:
+            logger.error(e, exc_info=True, extra={"id": self.name})
     
     def __repr__(self) -> str:
-        return f"Layer({self._nodes})"
+        json_repr = json.dumps({
+            "nodes": [x[1] for x in self.nodes],
+            "name": self.name,
+            "description": self.description 
+        })
+        return f"Layer({json_repr})"
 
 
 class Node(BaseChain):
@@ -203,8 +297,12 @@ class Node(BaseChain):
             self.name = name
         # Store the function to be executed by the node
         self.func = func
-        # Generate a random ID for the node
         self.id = _id_generator(30)
+        self.nodes = [(self.name, self.name)]
+        self.edges = []
+        self.first_nodes = [(self.name, self.name)]
+        self.last_nodes = [(self.name, self.name)]
+        self._dot = _create_dot(self.edges, self.nodes, self.name, self.description)
     
     def add_node(self, other, before: bool) ->BaseChain:
         # Create a deep copy of the current node to avoid modifying the original
@@ -223,21 +321,30 @@ class Node(BaseChain):
         return chain
     
     def __call__(self, *args, **kwargs)-> Any:
+        try:
         # If the function does not accept positional arguments
-        if not self.positional_or_keyword:
-            # Map the input arguments to the function's parameters
-            inp_args = _input_args(args, kwargs, node_args=self.args)
-            # Call the function with keyword arguments
-            return self.func(**inp_args)
-        else:
-            # Call the function with positional arguments
-            return self.func(*args, **kwargs)
+            logger.info("Start Node", extra={"id": self.name})
+            if not self.positional_or_keyword:
+                # Map the input arguments to the function's parameters
+                logger.info("Select input args", extra={"id": self.name})
+                inp_args = _input_args(args, kwargs, node_args=self.args)
+                # Call the function with keyword arguments
+                logger.info("End Node", extra={"id": self.name})
+                return self.func(**inp_args)
+            else:
+                # Call the function with positional arguments
+                logger.info("End Node", extra={"id": self.name})
+                return self.func(*args, **kwargs)
+        except Exception as e:
+            logger.error(e, exc_info=True, extra={"id": self.name})
     
     def __repr__(self) ->str:
-        json_func = json.dumps({'name':self.name, 
-                                "description":self.description,
-                                "args": self.args})
-        return f"Node({json_func})"
+        json_repr = json.dumps({
+            "args": self.args,
+            "name": self.name,
+            "description": self.description 
+        })
+        return f"Node({json_repr})"
     
 
 class ConditionalNode(Node):
@@ -247,49 +354,45 @@ class ConditionalNode(Node):
                  description: Optional[str] = None, 
                  name: Optional[str] = None):
         super().__init__(func, description, name)
+        true_node = _remove_duplicate_node(true_node, [(self.name, self.name)])
+        false_node = _remove_duplicate_node(false_node, [(self.name, self.name), *false_node.nodes])
         self.true_node = true_node
         self.false_node = false_node
+        self.first_nodes = [(self.name, self.name, {"shape":'diamond', "style":'filled', "color":'lightgrey'})]
+        self.last_nodes = [*true_node.last_nodes, *false_node.last_nodes]
+        self.nodes = self.first_nodes + [*true_node.nodes, *false_node.nodes]
+        self.edges = [(self.name, true_node.nodes[0][0], {"xlabel": "True"}), (self.name, false_node.nodes[0][0], {"label": "False"}), *true_node.edges, *false_node.edges]
+        self._dot = _create_dot(self.edges, self.nodes, self.name, self.description)
     
     def __call__(self, *args, **kwargs)-> Any:
         # If the function does not accept positional arguments
-        if not self.positional_or_keyword:
-            # Map the input arguments to the function's parameters
-            inp_args = _input_args(args, kwargs, node_args=self.args)
-            # Call the function with keyword arguments
-            res = self.func(**inp_args)
-            assert isinstance(res, bool), "The output of ConditionalNode's function must be boolean"
+        try:
+            logger.info("Start ConditionlNode", extra={"id": self.name})
+            logger.info("Get bool value", extra={"id": self.name})
+            if not self.positional_or_keyword:
+                # Map the input arguments to the function's parameters
+                logger.info("Select input args", extra={"id": self.name})
+                inp_args = _input_args(args, kwargs, node_args=self.args)
+                # Call the function with keyword arguments
+                res = self.func(**inp_args)
+                assert isinstance(res, bool), "The output of ConditionalNode's function must be boolean"
+            else:
+                # Call the function with positional arguments
+                res = self.func(*args, **kwargs)
+                assert isinstance(res, bool), "The output of ConditionalNode's function must be boolean"
+
+            logger.info(f"Execute {str(res)} Node", extra={"id": self.name})
+            logger.info("End conditionalNode", extra={"id": self.name})
             # if the output is true the true_node will be executed, otherwise the false_node
-            return self.true_node(*args, **kwargs) if res else self.false_node(*args, **kwargs)
-        else:
-            # Call the function with positional arguments
-            res = self.func(*args, **kwargs)
-            assert isinstance(res, bool), "The output of ConditionalNode's function must be boolean"
-            return self.true_node(*args, **kwargs) if res else self.false_node(*args, **kwargs)
+            return  self.true_node(*args, **kwargs) if res else self.false_node(*args, **kwargs)
+        except Exception as e:
+            logger.error(e, exc_info=True, extra={"id": self.name})
         
     def __repr__(self) ->str:
-        json_func = json.dumps({'name':self.name, 
-                                "description":self.description,
-                                "args": self.args})
-        json_true = json.dumps({'name':self.true_node.name, 
-                                "description":self.true_node.description,
-                                "args": self.true_node.args})
-        json_false = json.dumps({'name':self.false_node.name, 
-                                "description":self.false_node.description,
-                                "args": self.false_node.args})
-        return f"ConditionalNode(func:{json_func}, true: {json_true}, false: {json_false})"
-    
-
-class Variable(BaseChain):
-    def __init__(self, value: Any, name: str):
-        self.value = value
-        self.name = name
-    
-    def __call__(self, *args, **kwargs)-> Any:
-        return self.value
-    
-    def __repr__(self) ->str:
-        json_func = json.dumps({'value':self.value, 
-                                "name":self.name})
-        return f"Variable({json_func})"
-
-
+        json_repr = json.dumps({
+            "args": self.args,
+            "nodes": [x[1] for x in self.nodes],
+            "name": self.name,
+            "description": self.description 
+        })
+        return f"ConditionalNode({json_repr})"

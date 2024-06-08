@@ -1,13 +1,22 @@
 import inspect
 import random
 import string
-from typing import Callable, Tuple, List, Dict
-import os
+from typing import Callable, Tuple, List, Dict, Optional
+import graphviz
 
-
-class Settings:
-    cpus: int = max([int(os.cpu_count()/2), 1]) # Number of CPUs for multiprocessing 
-    maxsize: int = 2 # maxsize of lru_cache function
+def _create_dot(edges: list, nodes: list, name: str, description: Optional[str]):
+    dot = graphviz.Digraph(name, comment=description, format="png")
+    for x in nodes:
+        if len(x) == 3:
+            dot.node(name=x[0], label=x[1], **x[2])
+        else:
+            dot.node(name=x[0], label=x[1])
+    for x in edges:
+        if len(x) == 3:
+            dot.edge(tail_name=x[0], head_name=x[1], **x[2])
+        else:
+            dot.edge(tail_name=x[0], head_name=x[1])
+    return dot
 
 # Function to generate a random string of a given size
 def _id_generator(str_size) ->str:
