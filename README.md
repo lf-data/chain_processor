@@ -25,7 +25,7 @@ or
 pip install chain-processor
 ```
 
-Since the package use graphviz library, follow the installation instructions ([graphviz](https://github.com/xflr6/graphviz)).
+Since the package use graphviz library, follow the [installation instructions](https://github.com/xflr6/graphviz).
 
 ## Examples
 
