@@ -181,9 +181,6 @@ class Chain(BaseChain):
         except Exception as e:
             logger.error(e, exc_info=True, extra={"id": self.name})
 
-    def render(self, *args, **kwargs):
-        self._dot.render(*args, **kwargs)
-
     def view(self, *args, **kwargs):
         self._dot.view(*args, **kwargs)
     
@@ -361,8 +358,8 @@ class ConditionalNode(Node):
         self.first_nodes = [(self.name, self.name, {"shape":'diamond', "style":'filled', "color":'lightgrey'})]
         self.last_nodes = [*true_node.last_nodes, *false_node.last_nodes]
         self.nodes = self.first_nodes + [*true_node.nodes, *false_node.nodes]
-        true_edges = [(self.name, x[0], {"xlabel": "true"}) for x in true_node.first_nodes]
-        false_edges = [(self.name, x[0], {"xlabel": "false"}) for x in false_node.first_nodes]
+        true_edges = [(self.name, x[0], {"xlabel": "True"}) for x in true_node.first_nodes]
+        false_edges = [(self.name, x[0], {"xlabel": "False"}) for x in false_node.first_nodes]
         self.edges = [*true_edges, *false_edges, *true_node.edges, *false_node.edges]
         self._dot = _create_dot(self.edges, self.nodes, self.name, self.description)
     

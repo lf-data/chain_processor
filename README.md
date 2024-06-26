@@ -25,27 +25,7 @@ or
 pip install chain-processor
 ```
 
-
-Since the package use graphviz library, to render the generated DOT source code, you also need to install Graphviz
-([download page](http://www.graphviz.org/download/),
-[archived versions](http://www.graphviz.org/Download_archive.php),
-[installation procedure for Windows](https://graphviz.gitlab.io/_pages/Download/Download_windows.html)).
-
-Make sure that the directory containing the `dot` executable is on your
-systems' `PATH`
-(sometimes done by the installer;
-setting `PATH` on
-[Linux](https://www.computerhope.com/issues/ch001647.htm),
-[Mac](https://stackoverflow.com/questions/22465332/setting-path-environment-variable-in-mac-permanently),
-and [Windows](https://www.architectryan.com/2018/03/17/add-to-the-path-on-windows-10/)).
-
-Anaconda: see the conda-forge package
-[conda-forge/python-graphviz](https://anaconda.org/conda-forge/python-graphviz)
-([feedstock](https://github.com/conda-forge/python-graphviz-feedstock)),
-which should automatically `conda install`
-[conda-forge/graphviz](https://anaconda.org/conda-forge/graphviz)
-([feedstock](https://github.com/conda-forge/graphviz-feedstock)) as dependency.
-
+Since the package use graphviz library, follow the [installation instructions](https://github.com/xflr6/graphviz).
 
 ## Examples
 
@@ -69,7 +49,7 @@ print(chain(2, 3))  # Output: 3.333
 chain.view()
 ```
 
-![chain1](./images/chain1.png)
+![chain1](https://raw.githubusercontent.com/lf-data/chain_processor/main/images/chain1.png)
 
 ### 2. String Manipulation
 
@@ -280,7 +260,7 @@ print(chain(4)) # This number is not prime
 chain.view()
 ```
 
-![chain2](./images/chain2.png)
+![chain2](https://raw.githubusercontent.com/lf-data/chain_processor/main/images/chain2.png)
 
 
 ### 12. Complex chain with nodes repeated several times
@@ -306,7 +286,7 @@ print(chain(1)) # Output: 46
 chain.view()
 ```
 
-![chain3](./images/chain3.png)
+![chain3](https://raw.githubusercontent.com/lf-data/chain_processor/main/images/chain3.png)
 
 
 

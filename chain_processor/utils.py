@@ -6,6 +6,9 @@ import graphviz
 
 def _create_dot(edges: list, nodes: list, name: str, description: Optional[str]):
     dot = graphviz.Digraph(name, comment=description, format="png")
+    dot.attr('node', shape='box')
+    # dot.attr(rankdir='LR')
+    dot.attr("graph", **{'splines': 'true', 'nodesep': '0.7', 'ranksep': '0.7'})
     for x in nodes:
         if len(x) == 3:
             dot.node(name=x[0], label=x[1], **x[2])
